@@ -24,8 +24,7 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 import httpx
 
-# add to env for 
-#from backend.encrypt import encrypt_token, decrypt_token, migrate_plain
+from backend.encrypt import encrypt_token, decrypt_token, migrate_plain
 
 TOOL_META = {"label": "Git Manager", "icon": "&#x2387;", "description": "Project version control and AI workspace management"}
 
