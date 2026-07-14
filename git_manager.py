@@ -280,7 +280,7 @@ def render_panel_for_module(request: Request, module_root: Path) -> str:
                    <div style="border-top:var(--border-thick) solid var(--border);margin-top:0.5rem;padding-top:0.4rem;">
                        <a href="{_P}/" style="font-size:0.72rem;color:var(--accent);">Git Manager &#x2192;</a>
                    </div>
-                </div>""")
+                </div>"""
 
 # -- HTML helpers --
 
