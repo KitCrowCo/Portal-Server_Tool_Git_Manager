@@ -513,3 +513,57 @@ async def workspaces_push_pr(wid: str, title: str = Form(""), body: str = Form("
 async def workspaces_commit(wid: str, message: str = Form("")):
     ok, out = workspace_commit(wid, message)
     return HTMLResponse(f'<pre style="color:{"var(--accent)" if ok else "#ff5f5f"};font-size:0.75rem;">{_esc(out)}</pre>')
+
+# git_manager.py — implements built_ins.py's DiffBackend shape (pending/diff/accept/reject) against the existing workspace_diff()/workspace_commit() primitives.
+# Semantics differ from ShadowStore by necessity: a shadow entry hasn't touched real files yet, but a git workspace branch is already committed to itself
+# - "accept" here means "pull this one file's branch version into main"
+# - "reject" means "reset this one file on the branch back to main's version" (abandon that file's change without discarding the rest of the branch).
+
+class GitWorkspaceDiffBackend:
+    def __init__(self, wid: str):
+        self.wid = wid
+        self.ws = get_workspace(wid)
+        self.proj = get_project(self.ws["project_id"]) if self.ws else None
+        self.cwd = _repo_path(self.proj) if self.proj else None
+        self.main = self.proj.get("main_branch", "main") if self.proj else "main"
+
+    def _changed_files(self) -> list:
+        if not self.ws or not self.proj: return []
+        _run(["checkout", self.ws["branch"]], self.cwd)
+        rc, out = _run(["diff", "--name-status", f"{self.main}...{self.ws['branch']}"], self.cwd, timeout=15)
+        if rc != 0: return []
+        rows = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 2: continue
+            status, path = parts[0], parts[-1]
+            rc2, numstat = _run(["diff", "--numstat", f"{self.main}...{self.ws['branch']}", "--", path], self.cwd, timeout=10)
+            is_binary = numstat.strip().startswith("-\t-")
+            rows.append({"path": path, "author": self.ws.get("label", ""), "kind": "binary" if is_binary else "text", "size": 0, "status": status})
+        return rows
+
+    def pending(self) -> list: return self._changed_files()
+
+    def diff(self, path: str) -> str:
+        if not self.ws: return ""
+        _run(["checkout", self.ws["branch"]], self.cwd)
+        rc, out = _run(["diff", f"{self.main}...{self.ws['branch']}", "--", path], self.cwd, timeout=15)
+        return out if rc == 0 else f"diff failed: {out}"
+
+    def accept(self, path: str) -> bool:
+        if not self.ws or not self.proj: return False
+        _run(["checkout", self.main], self.cwd)
+        rc, _ = _run(["checkout", self.ws["branch"], "--", path], self.cwd, timeout=15)
+        if rc != 0: return False
+        _run(["add", path], self.cwd)
+        rc2, _ = _run(["commit", "-m", f"accept {path} from workspace {self.ws['label']}"], self.cwd, timeout=15)
+        return rc2 == 0
+
+    def reject(self, path: str) -> bool:
+        if not self.ws or not self.proj: return False
+        _run(["checkout", self.ws["branch"]], self.cwd)
+        rc, _ = _run(["checkout", self.main, "--", path], self.cwd, timeout=15)
+        if rc != 0: return False
+        _run(["add", path], self.cwd)
+        rc2, _ = _run(["commit", "-m", f"reject {path} - reset to {self.main}"], self.cwd, timeout=15)
+        return rc2 == 0
