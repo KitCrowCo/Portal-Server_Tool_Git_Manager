@@ -506,7 +506,7 @@ async def workspaces_sync(wid: str):
 
 @router.post("/workspaces/{wid}/push-pr", response_class=HTMLResponse)
 async def workspaces_push_pr(wid: str, title: str = Form(""), body: str = Form("")):
-    ok, out = await workspace_push_pr(wid, title, body, {"Content-Type": "application/json"})
+    ok, out = await workspace_push_pr(wid, title, body)
     return HTMLResponse(f'<pre style="color:{"var(--accent)" if ok else "#ff5f5f"};font-size:0.75rem;">{_esc(out)}</pre>')
 
 @router.post("/workspaces/{wid}/commit", response_class=HTMLResponse)
