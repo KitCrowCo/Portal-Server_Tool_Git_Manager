@@ -40,7 +40,7 @@ decrypt_token = None
 encrypt_token = None
 
 def init_module(env: dict):
-    global ENV, _P
+    global ENV, _P, encrypt_token, decrypt_token   # the token helpers are module-level: without them in this list the assignments below stayed local and _remote_url called None
     ENV = env
     _P  = env.get("meta", {}).get("prefix", _P)
     for d in (CONN_DIR, PROJ_DIR, WS_DIR): d.mkdir(parents=True, exist_ok=True)
